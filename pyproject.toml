@@ -3,9 +3,9 @@ requires = ["flit_core >=2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name =  "py-project-toml"
+name =  "numtorch"
 authors = [
-    {name = "Daniel Ciborowski", email = "dciborow@microsoft.com"},
+    {name = "Niklas Dobberstein", email = "niklas.dobberstein02@gmail.com"},
 ]
 description = "Sample Python Project for creating a new Python Module"
 readme = "README.md"
@@ -52,7 +52,7 @@ Source = "https://github.com/microsoft/python-package-template"
 Tracker = "https://github.com/microsoft/python-package-template/issues"
 
 [tool.flit.module]
-name = "python_package"
+name = "numtorch"
 
 [tool.bandit]
 exclude_dirs = ["build","dist","tests","scripts"]
