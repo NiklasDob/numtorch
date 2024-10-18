@@ -40,6 +40,7 @@ def broadcast_to(t1: Tensor, t2: Tensor):
             raise ValueError(f"Cannot broadcast: dimension mismatch between t1 {shape1} and t2 {shape2}")
 
     expanded_data = np.broadcast_to(t2._data, shape1)
+
     out = Tensor(expanded_data, children=(t2,), op="broadcast")
 
     def _backward():
@@ -63,10 +64,16 @@ def broadcast_to(t1: Tensor, t2: Tensor):
 
 
 class Tensor:
-    def __init__(self, arr, children=(), op=None):
-        assert isinstance(arr, list) or isinstance(arr, tuple) or isinstance(arr, np.ndarray)
+    def __init__(self, arr, children=(), op=None, dtype=np.float32):
+        assert (
+            isinstance(arr, list)
+            or isinstance(arr, tuple)
+            or isinstance(arr, np.ndarray)
+            or isinstance(arr, float)
+            or isinstance(arr, int)
+        )
         # data = convert_array_to_value_arr(arr)
-        data = np.array(arr)
+        data = np.array(arr, dtype=dtype)
         self._data = data
         self.grad = np.zeros_like(data)
 
@@ -105,6 +112,49 @@ class Tensor:
 
         return out
 
+    def __mul__(self, other):
+        other = self._convert_other(other)
+        out = Tensor(self._data * other._data, children=(self, other), op="mul")
+
+        def _backward():
+            self.grad += other._data * out.grad
+            other.grad += self._data * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    def __pow__(self, other):
+        other = self._convert_other(other)
+        out = Tensor(self._data**other._data, children=(self, other), op="pow")
+
+        def _backward():
+            self.grad += (other._data * self._data ** (other._data - 1)) * out.grad
+            other.grad += out._data * np.log(self._data) * out.grad
+
+        out._backward = _backward
+
+        return out
+
+    def __neg__(self):
+        out = self * Tensor(-1, children=(self,), op="-")
+        return out
+
+    def __radd__(self, other):  # other + self
+        return self + other
+
+    def __rsub__(self, other):  # other - self
+        return other + (-self)
+
+    def __rmul__(self, other):  # other * self
+        return self * other
+
+    def __truediv__(self, other):  # self / other
+        return self * other ** (-1)
+
+    def __rtruediv__(self, other):  # other / self
+        return other * self ** (-1)
+
     def backward(self):
         self.grad = np.ones_like(self._data)
 
@@ -129,9 +179,16 @@ class Tensor:
 
 
 if __name__ == "__main__":
-    x = Tensor([1, 2, 3])
-    y = Tensor([1])
+    # https://cupy.dev/
+    x = Tensor([[1], [2], [3]])
+    y = Tensor([[2], [2], [2]])
 
-    z = x + y
+    z = x**y
+    # z = a ** y
+    # dz / dy = a**y * log(a)
+    # z = -z
+    # z = z / 2
     z.backward()
-    print(x.grad, x.shape)
+
+    print("x.grad:", x.grad)
+    print("y.grad:", y.grad)
