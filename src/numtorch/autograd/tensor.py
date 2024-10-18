@@ -1,3 +1,4 @@
+from __future__ import annotations
 from numtorch.autograd.value import Value
 import numpy as np
 
@@ -38,25 +39,7 @@ def broadcast_to(t1: Tensor, t2: Tensor):
         if dim1 != dim2 and dim2 != 1:
             raise ValueError(f"Cannot broadcast: dimension mismatch between t1 {shape1} and t2 {shape2}")
 
-    # Create a new Tensor with the broadcasted values
-    def expand(data, target_shape):
-        """
-        Recursively expand the dimensions of data to match the target shape.
-        """
-        if isinstance(data, list):
-            # If we're already at the correct shape, return data
-            if len(data) == target_shape[0]:
-                return [expand(d, target_shape[1:]) for d in data]
-            # If the current dimension is 1, broadcast it by repeating the data
-            elif len(data) == 1:
-                return [expand(data[0], target_shape[1:]) for _ in range(target_shape[0])]
-            else:
-                raise ValueError("Data cannot be expanded to the target shape")
-        else:
-            # This is a Value object; no further expansion needed
-            return data
-
-    expanded_data = expand(t2._data, shape1)
+    expanded_data = np.broadcast_to(t2._data, shape1)
     out = Tensor(expanded_data, children=(t2,), op="broadcast")
 
     def _backward():
@@ -82,13 +65,14 @@ def broadcast_to(t1: Tensor, t2: Tensor):
 class Tensor:
     def __init__(self, arr, children=(), op=None):
         assert isinstance(arr, list) or isinstance(arr, tuple) or isinstance(arr, np.ndarray)
-        data = convert_array_to_value_arr(arr)
+        # data = convert_array_to_value_arr(arr)
+        data = np.array(arr)
         self._data = data
         self.grad = np.zeros_like(data)
 
         self._backward = lambda: None
-        self.children = children
-        self.op = op
+        self._children = children
+        self._op = op
 
     @property
     def shape(self):
@@ -103,11 +87,14 @@ class Tensor:
     def __len__(self):
         return len(self._data)
 
-    def __add__(self, other):
-        other = other if isinstance(other, Tensor) else Tensor(other)
-        if self.shape != other.shape:
-            other = broadcast_to(self, other)
+    def _convert_other(self, other):
+        out = other if isinstance(other, Tensor) else Tensor(other)
+        if self.shape != out.shape:
+            out = broadcast_to(self, out)
+        return out
 
+    def __add__(self, other):
+        other = self._convert_other(other)
         out = Tensor(self._data + other._data, children=(self, other), op="+")
 
         def _backward():
@@ -118,5 +105,33 @@ class Tensor:
 
         return out
 
+    def backward(self):
+        self.grad = np.ones_like(self._data)
+
+        topo = []
+        seen = set()
+
+        def build_topo_sort(child):
+            if child in seen:
+                return
+            seen.add(child)
+            for c in child._children:
+                build_topo_sort(c)
+            topo.append(child)
+
+        build_topo_sort(self)
+
+        for node in reversed(topo):
+            node._backward()
+
     def __repr__(self) -> str:
         return f"Tensor({self._data})"
+
+
+if __name__ == "__main__":
+    x = Tensor([1, 2, 3])
+    y = Tensor([1])
+
+    z = x + y
+    z.backward()
+    print(x.grad)
