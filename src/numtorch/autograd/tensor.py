@@ -134,4 +134,4 @@ if __name__ == "__main__":
 
     z = x + y
     z.backward()
-    print(x.grad)
+    print(x.grad, x.shape)
