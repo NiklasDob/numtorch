@@ -8,7 +8,10 @@ from numtorch.nn.base import Module
 
 
 class Linear(Module):
-    def __init__(self, in_features, out_features):
+    def __init__(self, in_features: int, out_features: int):
+        assert isinstance(in_features, int) and in_features > 0
+        assert isinstance(out_features, int) and out_features > 0
+
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Tensor(cp.random.randn(in_features, out_features))
@@ -29,7 +32,7 @@ class Linear(Module):
             # do/db = 1
             # do/dx = w
             x.grad += cp.matmul(out.grad, self.weight._data.T)
-            self.weight.grad += cp.matmul(x._data.T, out.grad.T)
+            self.weight.grad += cp.matmul(x._data.T, out.grad)
             self.bias.grad += out.grad.sum(axis=0)
 
         out._backward = backward
@@ -43,7 +46,7 @@ if __name__ == "__main__":
     layer_weight = cp.random.randn(2, 3)
     layer.weight = Tensor(layer_weight)
     layer.bias = Tensor(cp.ones(3))
-    x = Tensor([[1, 2], [3, 4], [5, 6]])
+    x = Tensor([[1, 2], [3, 4], [5, 6], [7, 8]])
     y = layer(x)
     print(y)
     y.backward()
@@ -52,7 +55,7 @@ if __name__ == "__main__":
     try:
         import torch
 
-        x = torch.tensor([[1, 2], [3, 4], [5, 6]], dtype=torch.float32, requires_grad=True)
+        x = torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=torch.float32, requires_grad=True)
         layer = torch.nn.Linear(2, 3)
         # layer.weight = torch.nn.Parameter(torch.ones((3, 2), dtype=torch.float32, requires_grad=True))
         w = torch.from_numpy(layer_weight)
