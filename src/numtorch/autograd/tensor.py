@@ -96,6 +96,16 @@ class Tensor:
 
         return get_shape(self._data)
 
+    def reshape(self, *shape) -> Tensor:
+        original_shape = self._data.shape
+        out = Tensor(self._data.reshape(*shape), children=(self,), op="reshape")
+
+        def _backward():
+            self.grad += out.grad.reshape(original_shape)
+
+        out._backward = _backward
+        return out
+
     def __len__(self):
         return len(self._data)
 

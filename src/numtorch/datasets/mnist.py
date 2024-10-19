@@ -65,4 +65,4 @@ def load_mnist():
     x_test = read_idx("t10k-images-idx3-ubyte.gz")
     y_test = read_idx("t10k-labels-idx1-ubyte.gz")
 
-    return (Tensor(x_train), Tensor(y_train)), (Tensor(x_test), Tensor(y_test))
+    return (Tensor(x_train), Tensor(y_train, dtype=cp.int32)), (Tensor(x_test), Tensor(y_test, dtype=cp.int32))
