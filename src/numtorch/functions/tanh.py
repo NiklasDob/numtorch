@@ -1,19 +1,30 @@
-import numpy as np
-from numtorch.autograd import Value
+try:
+    import cupy as cp
+except ImportError:
+    import numpy as cp
+from numtorch.autograd import Value, Tensor
+from typing import Union
 
 
-def tanh(v: Value):
-    out = Value(np.tanh(v.value), children=(v,), op="tanh")
+def tanh(v: Union[Value, Tensor]):
+    if isinstance(v, Tensor):
+        out = Tensor(cp.tanh(v._data), children=(v,), op="tanh")
 
-    def _backward():
-        v.grad += (1 - out.value**2) * out.grad
+        def _backward():
+            v.grad += (1 - out._data**2) * out.grad
+
+    else:
+        out = Value(cp.tanh(v.value), children=(v,), op="tanh")
+
+        def _backward():
+            v.grad += (1 - out.value**2) * out.grad
 
     out._backward = _backward
     return out
 
 
 if __name__ == "__main__":
-    x = Value(1)
+    x = Tensor([1, 2, 3])
     y = tanh(x)
     print(y)
     y.backward()

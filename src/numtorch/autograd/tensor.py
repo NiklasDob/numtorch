@@ -1,6 +1,11 @@
 from __future__ import annotations
 from numtorch.autograd.value import Value
-import numpy as np
+
+try:
+    import cupy as cp
+except ImportError:
+    print("Could not import cupy falling back to numpy...")
+    import numpy as cp
 
 
 def convert_array_to_value_arr(arr):
@@ -39,7 +44,7 @@ def broadcast_to(t1: Tensor, t2: Tensor):
         if dim1 != dim2 and dim2 != 1:
             raise ValueError(f"Cannot broadcast: dimension mismatch between t1 {shape1} and t2 {shape2}")
 
-    expanded_data = np.broadcast_to(t2._data, shape1)
+    expanded_data = cp.broadcast_to(t2._data, shape1)
 
     out = Tensor(expanded_data, children=(t2,), op="broadcast")
 
@@ -52,9 +57,9 @@ def broadcast_to(t1: Tensor, t2: Tensor):
         reduced_grad = grad
         for i, (dim1, dim2) in enumerate(zip(shape1, shape2)):
             if dim2 == 1:
-                reduced_grad = np.sum(reduced_grad, axis=i, keepdims=True)
+                reduced_grad = cp.sum(reduced_grad, axis=i, keepdims=True)
 
-        reduced_grad = np.squeeze(reduced_grad)
+        reduced_grad = cp.squeeze(reduced_grad)
 
         t2.grad += reduced_grad
 
@@ -64,18 +69,18 @@ def broadcast_to(t1: Tensor, t2: Tensor):
 
 
 class Tensor:
-    def __init__(self, arr, children=(), op=None, dtype=np.float32):
+    def __init__(self, arr, children=(), op=None, dtype=cp.float32):
         assert (
             isinstance(arr, list)
             or isinstance(arr, tuple)
-            or isinstance(arr, np.ndarray)
+            or isinstance(arr, cp.ndarray)
             or isinstance(arr, float)
             or isinstance(arr, int)
         )
         # data = convert_array_to_value_arr(arr)
-        data = np.array(arr, dtype=dtype)
+        data = cp.array(arr, dtype=dtype)
         self._data = data
-        self.grad = np.zeros_like(data)
+        self.grad: cp.ndarray = cp.zeros_like(data)
 
         self._backward = lambda: None
         self._children = children
@@ -130,7 +135,7 @@ class Tensor:
 
         def _backward():
             self.grad += (other._data * self._data ** (other._data - 1)) * out.grad
-            other.grad += out._data * np.log(self._data) * out.grad
+            other.grad += out._data * cp.log(self._data) * out.grad
 
         out._backward = _backward
 
@@ -156,7 +161,7 @@ class Tensor:
         return other * self ** (-1)
 
     def backward(self):
-        self.grad = np.ones_like(self._data)
+        self.grad = cp.ones_like(self._data)
 
         topo = []
         seen = set()
@@ -180,8 +185,12 @@ class Tensor:
 
 if __name__ == "__main__":
     # https://cupy.dev/
+    # micromamba install -c conda-forge cupy-core
+    # only numpy
     x = Tensor([[1], [2], [3]])
     y = Tensor([[2], [2], [2]])
+    # TODO: Test if the gradient is correct
+    z = Tensor(1)
 
     z = x**y
     # z = a ** y
