@@ -24,7 +24,7 @@ class Softmax(Module):
         """
         exp_vals = cp.exp(x._data - cp.max(x._data, axis=self.axis, keepdims=True))
         softmax_probs = exp_vals / cp.sum(exp_vals, axis=self.axis, keepdims=True)
-        out = Tensor(softmax_probs, children=(x,), op="softmax")
+        out = Tensor(softmax_probs, requires_grad=x._requires_grad, children=(x,), op="softmax")
 
         def _backward():
             """
@@ -40,7 +40,7 @@ class Softmax(Module):
                 grad_i = grad[i].reshape(1, -1)  # Row vector
                 x.grad[i] += cp.dot(grad_i, jacobian).flatten()
 
-        out._backward = _backward
+        out._set_backward(_backward)
         return out
 
 

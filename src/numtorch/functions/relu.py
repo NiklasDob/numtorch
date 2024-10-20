@@ -10,10 +10,12 @@ from typing import Union
 
 def relu(v: Union[Value, Tensor]):
     if isinstance(v, Tensor):
-        out = Tensor(cp.maximum(0, v._data), children=(v,), op="relu")
+        out = Tensor(cp.maximum(0, v._data), requires_grad=v._requires_grad, dtype=v.dtype, children=(v,), op="relu")
 
         def _backward():
             v.grad += (out._data > 0.0).astype(out.grad.dtype) * out.grad
+
+        out._set_backward(_backward)
 
     else:
         out = Value(cp.maximum(0, v.value), children=(v,), op="relu")
@@ -21,7 +23,8 @@ def relu(v: Union[Value, Tensor]):
         def _backward():
             v.grad += (1.0 if out.value > 0.0 else 0.0) * out.grad
 
-    out._backward = _backward
+        out._backward = _backward
+
     return out
 
 

@@ -14,14 +14,16 @@ class Linear(Module):
 
         self.in_features = in_features
         self.out_features = out_features
-        self.weight = Tensor(cp.random.randn(in_features, out_features))
-        self.bias = Tensor(cp.random.randn(out_features))
+        self.weight = Tensor(cp.random.randn(in_features, out_features), requires_grad=True)
+        self.bias = Tensor(cp.random.randn(out_features), requires_grad=True)
 
         self._backward = lambda: None
 
     def forward(self, x: Tensor):
         out = Tensor(
             cp.matmul(x._data, self.weight._data) + self.bias._data,
+            requires_grad=True,
+            dtype=x.dtype,
             children=(x, self.weight, self.bias),
             op="nn.Linear",
         )
@@ -35,7 +37,7 @@ class Linear(Module):
             self.weight.grad += cp.matmul(x._data.T, out.grad)
             self.bias.grad += out.grad.sum(axis=0)
 
-        out._backward = backward
+        out._set_backward(backward)
 
         return out
 

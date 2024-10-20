@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Tuple, Union
 from numtorch.autograd.value import Value
 
 try:
@@ -63,13 +64,20 @@ def broadcast_to(t1: Tensor, t2: Tensor):
 
         t2.grad += reduced_grad
 
-    out._backward = _backward
+    out._set_backward(_backward)
 
     return out
 
 
 class Tensor:
-    def __init__(self, arr, children=(), op=None, dtype=cp.float32):
+    def __init__(
+        self,
+        arr,
+        children: Tuple[Tensor, ...] = (),
+        op: Union[str, None] = None,
+        dtype=cp.float32,
+        requires_grad: bool = False,
+    ):
         assert (
             isinstance(arr, list)
             or isinstance(arr, tuple)
@@ -80,6 +88,7 @@ class Tensor:
         # data = convert_array_to_value_arr(arr)
         data = cp.array(arr, dtype=dtype)
         self.dtype = dtype
+        self._requires_grad = requires_grad
         self._data = data
         self.grad: cp.ndarray = cp.zeros_like(data)
 
@@ -87,13 +96,19 @@ class Tensor:
         self._children = children
         self._op = op
 
+    def _set_backward(self, func):
+        if self._requires_grad:
+            self._backward = func
+
     def __getitem__(self, index):
-        out = Tensor(self._data[index], dtype=self.dtype, children=(self,), op="__getitem__")
+        out = Tensor(
+            self._data[index], requires_grad=self._requires_grad, dtype=self.dtype, children=(self,), op="__getitem__"
+        )
 
         def _backward():
             self.grad[index] += out.grad
 
-        out._backward = _backward
+        out._set_backward(_backward)
         return out
 
     @property
@@ -108,12 +123,18 @@ class Tensor:
 
     def reshape(self, *shape) -> Tensor:
         original_shape = self._data.shape
-        out = Tensor(self._data.reshape(*shape), dtype=self.dtype, children=(self,), op="reshape")
+        out = Tensor(
+            self._data.reshape(*shape),
+            requires_grad=self._requires_grad,
+            dtype=self.dtype,
+            children=(self,),
+            op="reshape",
+        )
 
         def _backward():
             self.grad += out.grad.reshape(original_shape)
 
-        out._backward = _backward
+        out._set_backward(_backward)
         return out
 
     def __len__(self):
@@ -127,42 +148,60 @@ class Tensor:
 
     def __add__(self, other):
         other = self._convert_other(other)
-        out = Tensor(self._data + other._data, dtype=self.dtype, children=(self, other), op="+")
+        out = Tensor(
+            self._data + other._data,
+            requires_grad=self._requires_grad or other._requires_grad,
+            dtype=self.dtype,
+            children=(self, other),
+            op="+",
+        )
 
         def _backward():
             self.grad += out.grad
             other.grad += out.grad
 
-        out._backward = _backward
+        out._set_backward(_backward)
 
         return out
 
     def __mul__(self, other):
         other = self._convert_other(other)
-        out = Tensor(self._data * other._data, dtype=self.dtype, children=(self, other), op="mul")
+        out = Tensor(
+            self._data * other._data,
+            requires_grad=self._requires_grad or other._requires_grad,
+            dtype=self.dtype,
+            children=(self, other),
+            op="mul",
+        )
 
         def _backward():
             self.grad += other._data * out.grad
             other.grad += self._data * out.grad
 
-        out._backward = _backward
+        out._set_backward(_backward)
 
         return out
 
     def __pow__(self, other):
         other = self._convert_other(other)
-        out = Tensor(self._data**other._data, dtype=self.dtype, children=(self, other), op="pow")
+        out = Tensor(
+            self._data**other._data,
+            requires_grad=self._requires_grad or other._requires_grad,
+            dtype=self.dtype,
+            children=(self, other),
+            op="pow",
+        )
 
         def _backward():
             self.grad += (other._data * self._data ** (other._data - 1)) * out.grad
             other.grad += out._data * cp.log(self._data) * out.grad
 
-        out._backward = _backward
+        out._set_backward(_backward)
 
         return out
 
     def __neg__(self):
-        out = self * Tensor(-1, children=(self,), op="-")
+        out = self * Tensor(-1, requires_grad=self._requires_grad, dtype=self.dtype, children=(self,), op="-")
         return out
 
     def __radd__(self, other):  # other + self
@@ -207,8 +246,8 @@ if __name__ == "__main__":
     # https://cupy.dev/
     # micromamba install -c conda-forge cupy-core
     # only numpy
-    x = Tensor([[1], [2], [3]])
-    y = Tensor([[2], [2], [2]])
+    x = Tensor([[1], [2], [3]], requires_grad=False)
+    y = Tensor([[2], [2], [2]], requires_grad=True)
     # TODO: Test if the gradient is correct
     z = Tensor(1)
 

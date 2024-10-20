@@ -12,6 +12,8 @@ from numtorch.nn.relu import ReLU
 from numtorch.nn.sequential import Sequential
 from numtorch.nn.sigmoid import Sigmoid
 from numtorch.nn.tanh import Tanh
+from numtorch.optim.adamw import AdamW
+from numtorch.optim.sgd import SGD
 
 
 def calculate_accuracy(predictions: Tensor, targets: Tensor) -> float:
@@ -22,13 +24,15 @@ def calculate_accuracy(predictions: Tensor, targets: Tensor) -> float:
 
 
 if __name__ == "__main__":
+    cp.random.seed(0)
     (x_train, y_train), (x_test, y_test) = load_mnist()
 
-    learning_rate = 1e-1
-    mlp = MLP(784, [256, 128, 64, 32], 10, activation=Tanh())
+    learning_rate = 5e-3
+    mlp = MLP(784, [256, 128, 64], 10, activation=Tanh())
     net = Sequential(mlp)
     loss_metric = CrossEntropyLoss()
 
+    optimizer = AdamW(net.parameters(), lr=learning_rate)
     batch_size = 512
     num_batches = x_train.shape[0] // batch_size
     for epoch in tqdm(range(100), desc="Epochs"):
@@ -42,13 +46,8 @@ if __name__ == "__main__":
             loss = loss_metric(y_pred, y_batch)
             loss.backward()
 
-            for param in net.parameters():
-                param._data = param._data - learning_rate * param.grad
-
-            # Reset gradients
-            #  TODO: Write an optimizer class for this
-            for param in net.parameters():
-                param.grad = cp.zeros_like(param._data)
+            optimizer.step()
+            optimizer.zero_grad()
 
         y_pred_test = net(x_test.reshape(-1, 784))
         loss_test = loss_metric(y_pred_test, y_test)

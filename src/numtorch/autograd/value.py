@@ -39,7 +39,7 @@ class Value:
             self.grad += out.grad
             other.grad += out.grad
 
-        out._backward = _backward
+        out._set_backward(_backward)
 
         return out
 
@@ -54,7 +54,7 @@ class Value:
             self.grad += other.value * out.grad
             other.grad += self.value * out.grad
 
-        out._backward = _backward
+        out._set_backward(_backward)
 
         return out
 
@@ -66,7 +66,7 @@ class Value:
             def _backward():
                 self.grad += (other * self.value ** (other - 1)) * out.grad
 
-            out._backward = _backward
+            out._set_backward(_backward)
 
             return out
         elif isinstance(other, Value):
@@ -80,7 +80,7 @@ class Value:
                 self.grad += (other.value * self.value ** (other.value - 1)) * out.grad
                 other.grad += out.value * (np.log(self.value) * out.grad)
 
-            out._backward = _backward
+            out._set_backward(_backward)
 
             return out
 
@@ -93,7 +93,7 @@ class Value:
         def _backward():
             self.grad *= -1.0
 
-        out._backward = _backward
+        out._set_backward(_backward)
 
         return out
 
