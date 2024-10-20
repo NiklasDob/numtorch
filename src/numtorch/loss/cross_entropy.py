@@ -55,19 +55,13 @@ class CrossEntropyLoss(Module):
 
 
 if __name__ == "__main__":
-    # Example usage
-    # Predictions are of shape (N, C), where N is the number of samples and C is the number of classes
     predictions = Tensor(cp.array([[2.0, 1.0, 0.1], [1.0, 3.0, 0.1], [2.0, 2.0, 2.0]]))
-    # Targets are of shape (N,) containing the correct class indices
     targets = Tensor(cp.array([0, 1, 2]), dtype=int)
 
-    # Instantiate the cross-entropy loss layer
     loss_fn = CrossEntropyLoss()
 
-    # Compute the loss
-    loss = loss_fn.forward(predictions, targets)
+    loss = loss_fn(predictions, targets)
     print("Loss:", loss)
 
-    # Backward pass
     loss.backward()
     print("Gradients of predictions:\n", predictions.grad)

@@ -79,12 +79,22 @@ class Tensor:
         )
         # data = convert_array_to_value_arr(arr)
         data = cp.array(arr, dtype=dtype)
+        self.dtype = dtype
         self._data = data
         self.grad: cp.ndarray = cp.zeros_like(data)
 
         self._backward = lambda: None
         self._children = children
         self._op = op
+
+    def __getitem__(self, index):
+        out = Tensor(self._data[index], dtype=self.dtype, children=(self,), op="__getitem__")
+
+        def _backward():
+            self.grad[index] += out.grad
+
+        out._backward = _backward
+        return out
 
     @property
     def shape(self):
@@ -98,7 +108,7 @@ class Tensor:
 
     def reshape(self, *shape) -> Tensor:
         original_shape = self._data.shape
-        out = Tensor(self._data.reshape(*shape), children=(self,), op="reshape")
+        out = Tensor(self._data.reshape(*shape), dtype=self.dtype, children=(self,), op="reshape")
 
         def _backward():
             self.grad += out.grad.reshape(original_shape)
@@ -117,7 +127,7 @@ class Tensor:
 
     def __add__(self, other):
         other = self._convert_other(other)
-        out = Tensor(self._data + other._data, children=(self, other), op="+")
+        out = Tensor(self._data + other._data, dtype=self.dtype, children=(self, other), op="+")
 
         def _backward():
             self.grad += out.grad
@@ -129,7 +139,7 @@ class Tensor:
 
     def __mul__(self, other):
         other = self._convert_other(other)
-        out = Tensor(self._data * other._data, children=(self, other), op="mul")
+        out = Tensor(self._data * other._data, dtype=self.dtype, children=(self, other), op="mul")
 
         def _backward():
             self.grad += other._data * out.grad
@@ -141,7 +151,7 @@ class Tensor:
 
     def __pow__(self, other):
         other = self._convert_other(other)
-        out = Tensor(self._data**other._data, children=(self, other), op="pow")
+        out = Tensor(self._data**other._data, dtype=self.dtype, children=(self, other), op="pow")
 
         def _backward():
             self.grad += (other._data * self._data ** (other._data - 1)) * out.grad
