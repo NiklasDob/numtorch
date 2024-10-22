@@ -42,12 +42,12 @@ def broadcast_to(t1: Tensor, t2: Tensor):
 
     # Verify that broadcasting is possible for each dimension
     for dim1, dim2 in zip(shape1, shape2):
-        if dim1 != dim2 and dim2 != 1:
+        if dim1 != dim2 and dim2 != 1 and dim1 != 1:
             raise ValueError(f"Cannot broadcast: dimension mismatch between t1 {shape1} and t2 {shape2}")
 
     expanded_data = cp.broadcast_to(t2._data, shape1)
 
-    out = Tensor(expanded_data, children=(t2,), op="broadcast")
+    out = Tensor(expanded_data, children=(t2,), op="broadcast", requires_grad=t1._requires_grad or t2._requires_grad)
 
     def _backward():
         """
@@ -92,13 +92,17 @@ class Tensor:
         self._data = data
         self.grad: cp.ndarray = cp.zeros_like(data)
 
-        self._backward = lambda: None
+        self._backward = []
         self._children = children
         self._op = op
 
+    def internal_backward(self):
+        for func in reversed(self._backward):
+            func()
+
     def _set_backward(self, func):
         if self._requires_grad:
-            self._backward = func
+            self._backward.append(func)
 
     def __getitem__(self, index):
         out = Tensor(
@@ -121,6 +125,26 @@ class Tensor:
 
         return get_shape(self._data)
 
+    def __setitem__(self, index, value):
+        """
+        Allows in-place modification of tensor values at specific indices.
+        For example: x[:, 0] = 1
+        """
+        if isinstance(value, Tensor):
+            self._data[index] = value._data
+
+            self._children += (value,)
+
+            def _backward():
+                value.grad += self.grad[index]
+
+            value._set_backward(_backward)
+            # # Set the backward method for this modification
+            # self._set_backward(_backward)
+        else:
+            # Handle non-tensor values (e.g., setting with scalars or arrays)
+            self._data[index] = value
+
     def reshape(self, *shape) -> Tensor:
         original_shape = self._data.shape
         out = Tensor(
@@ -142,7 +166,7 @@ class Tensor:
 
     def _convert_other(self, other):
         out = other if isinstance(other, Tensor) else Tensor(other)
-        if self.shape != out.shape:
+        if self.shape != out.shape and len(self.shape) != len(out.shape):
             out = broadcast_to(self, out)
         return out
 
@@ -205,19 +229,25 @@ class Tensor:
         return out
 
     def __radd__(self, other):  # other + self
-        return self + other
+        o = other._convert_other(self)
+        return o + other
 
     def __rsub__(self, other):  # other - self
-        return other + (-self)
+        o = other._convert_other(self)
+        return other + (-o)
 
     def __rmul__(self, other):  # other * self
-        return self * other
+        o = other._convert_other(self)
+        return o * other
 
     def __truediv__(self, other):  # self / other
+
         return self * other ** (-1)
 
     def __rtruediv__(self, other):  # other / self
-        return other * self ** (-1)
+        o = other._convert_other(self)
+
+        return other * o ** (-1)
 
     def backward(self):
         self.grad = cp.ones_like(self._data)
@@ -236,7 +266,7 @@ class Tensor:
         build_topo_sort(self)
 
         for node in reversed(topo):
-            node._backward()
+            node.internal_backward()
 
     def __repr__(self) -> str:
         return f"Tensor({self._data})"

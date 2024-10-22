@@ -1,6 +1,6 @@
 # NumTorch
 
-**NumTorch** is a personal project aimed at recreating fundamental features of PyTorch using only NumPy/CuPy. The goal of the project is to gain a deeper understanding of the inner workings of PyTorch.
+**NumTorch** is a personal project aimed at recreating fundamental features of PyTorch using only NumPy/CuPy. The goal of the project is to gain a deeper understanding of the inner workings of PyTorch. This autograd implementation is inspired [Micrograd](https://github.com/karpathy/micrograd).
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -63,6 +63,7 @@ print(a.grad)  # Gradient of 'a' with respect to 'd'
 ```
 
 # Simple training on mnist
+See in `examples/mnist/mnist.py` for more details.
 
 ```python
 
