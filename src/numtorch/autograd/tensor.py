@@ -103,7 +103,8 @@ class Tensor:
         self.dtype = dtype
         self._requires_grad = requires_grad
         self._data = data
-        self.grad: cp.ndarray = cp.zeros_like(data)
+
+        self.grad: cp.ndarray = cp.zeros_like(data) if requires_grad else None
 
         self._backward = []
         self._children = children
@@ -116,6 +117,9 @@ class Tensor:
     def _set_backward(self, func):
         if self._requires_grad:
             self._backward.append(func)
+
+    def item(self):
+        return self._data.item()
 
     def __getitem__(self, index):
         out = Tensor(
@@ -194,25 +198,27 @@ class Tensor:
         )
 
         def _backward():
-            if self.shape == out.shape:
-                self.grad += out.grad
-            else:
-                sum_axis = []
-                for i in range(len(out.shape)):
-                    if out.shape[i] != self.shape[i]:
-                        sum_axis.append(i)
+            if self._requires_grad:
+                if self.shape == out.shape:
+                    self.grad += out.grad
+                else:
+                    sum_axis = []
+                    for i in range(len(out.shape)):
+                        if out.shape[i] != self.shape[i]:
+                            sum_axis.append(i)
 
-                self.grad += cp.sum(out.grad, axis=sum_axis, keepdims=True)
+                    self.grad += cp.sum(out.grad, axis=sum_axis, keepdims=True)
 
-            if other.shape == out.shape:
-                other.grad += out.grad
-            else:
-                sum_axis = []
-                for i in range(len(out.shape)):
-                    if out.shape[i] != other.shape[i]:
-                        sum_axis.append(i)
+            if other._requires_grad:
+                if other.shape == out.shape:
+                    other.grad += out.grad
+                else:
+                    sum_axis = []
+                    for i in range(len(out.shape)):
+                        if out.shape[i] != other.shape[i]:
+                            sum_axis.append(i)
 
-                other.grad += cp.sum(out.grad, axis=sum_axis, keepdims=True)
+                    other.grad += cp.sum(out.grad, axis=sum_axis, keepdims=True)
 
         out._set_backward(_backward)
 
@@ -229,27 +235,29 @@ class Tensor:
         )
 
         def _backward():
-            self_up = other._data * out.grad
-            if self.shape == self_up.shape :
-                self.grad += self_up
-            else:
-                sum_axis = []
-                for i in range(len(self_up.shape)):
-                    if self_up.shape[i] != self.shape[i]:
-                        sum_axis.append(i)
+            if self._requires_grad:
+                self_up = other._data * out.grad
+                if self.shape == self_up.shape :
+                    self.grad += self_up
+                else:
+                    sum_axis = []
+                    for i in range(len(self_up.shape)):
+                        if self_up.shape[i] != self.shape[i]:
+                            sum_axis.append(i)
 
-                self.grad += cp.sum(self_up, axis=sum_axis, keepdims=True)
+                    self.grad += cp.sum(self_up, axis=sum_axis, keepdims=True)
 
-            other_up = self._data * out.grad
-            if other.shape == other_up.shape :
-                other.grad += other_up
-            else:
-                sum_axis = []
-                for i in range(len(other_up.shape)):
-                    if other_up.shape[i] != other.shape[i]:
-                        sum_axis.append(i)
+            if other._requires_grad:
+                other_up = self._data * out.grad
+                if other.shape == other_up.shape :
+                    other.grad += other_up
+                else:
+                    sum_axis = []
+                    for i in range(len(other_up.shape)):
+                        if other_up.shape[i] != other.shape[i]:
+                            sum_axis.append(i)
 
-                other.grad += cp.sum(other_up, axis=sum_axis, keepdims=True)
+                    other.grad += cp.sum(other_up, axis=sum_axis, keepdims=True)
 
         out._set_backward(_backward)
 
@@ -266,8 +274,10 @@ class Tensor:
         )
 
         def _backward():
-            self.grad += (other._data * self._data ** (other._data - 1)) * out.grad
-            other.grad += out._data * cp.log(self._data) * out.grad
+            if self._requires_grad:
+                self.grad += (other._data * self._data ** (other._data - 1)) * out.grad
+            if other._requires_grad:
+                other.grad += out._data * cp.log(self._data) * out.grad
 
         out._set_backward(_backward)
 

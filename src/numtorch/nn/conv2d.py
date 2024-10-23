@@ -41,10 +41,8 @@ class Conv2D(Module):
         if self.padding > 0:
             x = nt.pad(x, ((0, 0), (0, 0), (self.padding, self.padding), (self.padding, self.padding)), "constant")
 
-        # Initialize the output tensor
         out = nt.Tensor(cp.zeros((b, self.out_channels, oh, ow)), requires_grad=True)
 
-        # Perform the convolution operation
         for i in range(oh):
             for j in range(ow):
                 i_start = i * self.stride
@@ -52,15 +50,14 @@ class Conv2D(Module):
                 i_end = i_start + kh
                 j_end = j_start + kw
 
-                # Extract the patch from the input and apply the convolution
                 x_patch = x[:, :, i_start:i_end, j_start:j_end]  # Shape (batch, in_channels, kh, kw)
                 out[:, :, i, j] = out[:, :, i, j] + (
                     nt.sum(
                         self.weight.reshape(1, self.out_channels, c, kh, kw) * x_patch.reshape(b, 1, c, kh, kw),
                         axis=(2, 3, 4),
-                    )  # Perform element-wise multiplication
+                    )
                     + self.bias
-                )  # Add bias to the result
+                )
 
         return out
 
