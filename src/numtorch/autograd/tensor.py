@@ -46,7 +46,8 @@ def broadcast_to(t1: Tensor, t2: Tensor):
             raise ValueError(f"Cannot broadcast: dimension mismatch between t1 {shape1} and t2 {shape2}")
 
     expanded_data = cp.broadcast_to(t2._data, shape1)
-
+    old_shape = t2._data.shape
+    new_shape = expanded_data.shape
     out = Tensor(expanded_data, children=(t2,), op="broadcast", requires_grad=t1._requires_grad or t2._requires_grad)
 
     def _backward():
@@ -56,9 +57,21 @@ def broadcast_to(t1: Tensor, t2: Tensor):
         grad = out.grad
 
         reduced_grad = grad
-        for i, (dim1, dim2) in enumerate(zip(shape1, shape2)):
-            if dim2 == 1:
-                reduced_grad = cp.sum(reduced_grad, axis=i, keepdims=True)
+        rev_shape1 = shape1[::-1]
+        rev_shape2 = shape2[::-1]
+        sum_axis = []
+        for i in range(len(rev_shape1)):
+            dim1 = rev_shape1[i]
+            if i < len(rev_shape2):
+                dim2 = rev_shape2[i]
+
+                if dim1 != dim2:
+                    sum_axis.append(len(reduced_grad.shape) - 1 - i)
+            else:
+                sum_axis.append(len(reduced_grad.shape) - 1 - i)
+
+
+        reduced_grad = cp.sum(reduced_grad, axis=sum_axis, keepdims=True)
 
         reduced_grad = cp.squeeze(reduced_grad)
 
@@ -181,8 +194,25 @@ class Tensor:
         )
 
         def _backward():
-            self.grad += out.grad
-            other.grad += out.grad
+            if self.shape == out.shape:
+                self.grad += out.grad
+            else:
+                sum_axis = []
+                for i in range(len(out.shape)):
+                    if out.shape[i] != self.shape[i]:
+                        sum_axis.append(i)
+
+                self.grad += cp.sum(out.grad, axis=sum_axis, keepdims=True)
+
+            if other.shape == out.shape:
+                other.grad += out.grad
+            else:
+                sum_axis = []
+                for i in range(len(out.shape)):
+                    if out.shape[i] != other.shape[i]:
+                        sum_axis.append(i)
+
+                other.grad += cp.sum(out.grad, axis=sum_axis, keepdims=True)
 
         out._set_backward(_backward)
 
@@ -199,8 +229,27 @@ class Tensor:
         )
 
         def _backward():
-            self.grad += other._data * out.grad
-            other.grad += self._data * out.grad
+            self_up = other._data * out.grad
+            if self.shape == self_up.shape :
+                self.grad += self_up
+            else:
+                sum_axis = []
+                for i in range(len(self_up.shape)):
+                    if self_up.shape[i] != self.shape[i]:
+                        sum_axis.append(i)
+
+                self.grad += cp.sum(self_up, axis=sum_axis, keepdims=True)
+
+            other_up = self._data * out.grad
+            if other.shape == other_up.shape :
+                other.grad += other_up
+            else:
+                sum_axis = []
+                for i in range(len(other_up.shape)):
+                    if other_up.shape[i] != other.shape[i]:
+                        sum_axis.append(i)
+
+                other.grad += cp.sum(other_up, axis=sum_axis, keepdims=True)
 
         out._set_backward(_backward)
 

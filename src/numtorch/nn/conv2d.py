@@ -56,7 +56,7 @@ class Conv2D(Module):
                 x_patch = x[:, :, i_start:i_end, j_start:j_end]  # Shape (batch, in_channels, kh, kw)
                 out[:, :, i, j] = out[:, :, i, j] + (
                     nt.sum(
-                        x_patch.reshape(b, 1, c, kh, kw) * self.weight.reshape(1, self.out_channels, c, kh, kw),
+                        self.weight.reshape(1, self.out_channels, c, kh, kw) * x_patch.reshape(b, 1, c, kh, kw),
                         axis=(2, 3, 4),
                     )  # Perform element-wise multiplication
                     + self.bias
@@ -66,6 +66,9 @@ class Conv2D(Module):
 
 
 if __name__ == "__main__":
-    x = nt.Tensor(cp.random.random((1, 1, 5, 5)))
-    layer = Conv2D(1, 3)
+    in_channel = 3
+    x = nt.Tensor(cp.random.random((16, in_channel, 5, 5)))
+    layer = Conv2D(in_channel, 3)
     y = layer(x)
+    # TODO: Figure out why this does not work. Probably something with the reshaping in the broadcast_to i would guess
+    y.backward()
