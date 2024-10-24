@@ -29,6 +29,20 @@ class Conv2D(Module):
         )
         self.bias = nt.Tensor(cp.random.randn(out_channels), requires_grad=True)
 
+    def calculate_output_shape(self, input_shape: Tuple[int, int, int]) -> Tuple[int, int, int]:
+        """
+        Calculates the output shape given the input shape.
+        :param input_shape: A tuple representing the input shape (channels, height, width)
+        :return: A tuple representing the output shape (out_channels, out_height, out_width)
+        """
+        c, h, w = input_shape
+        kh, kw = self.kernel_size
+
+        oh = (h - kh + 2 * self.padding) // self.stride + 1
+        ow = (w - kw + 2 * self.padding) // self.stride + 1
+
+        return self.out_channels, oh, ow
+
     def forward(self, x: nt.Tensor):
         b, c, h, w = x.shape  # Batch size, input channels, height, width
         kh, kw = self.kernel_size  # Kernel height, kernel width

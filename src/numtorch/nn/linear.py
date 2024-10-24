@@ -33,9 +33,12 @@ class Linear(Module):
             # do/dw = x
             # do/db = 1
             # do/dx = w
-            x.grad += cp.matmul(out.grad, self.weight._data.T)
-            self.weight.grad += cp.matmul(x._data.T, out.grad)
-            self.bias.grad += out.grad.sum(axis=0)
+            if x._requires_grad:
+                x.grad += cp.matmul(out.grad, self.weight._data.T)
+            if self.weight._requires_grad:
+                self.weight.grad += cp.matmul(x._data.T, out.grad)
+            if self.bias._requires_grad:
+                self.bias.grad += out.grad.sum(axis=0)
 
         out._set_backward(backward)
 

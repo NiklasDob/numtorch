@@ -6,9 +6,10 @@ except ImportError:
 from tqdm import tqdm
 from numtorch.datasets import load_mnist
 from numtorch.loss import CrossEntropyLoss
-from numtorch.nn import MLP, Conv2D
+from numtorch.nn import MLP, Conv2D, MaxPooling2D
 from numtorch.autograd import Tensor
 from numtorch.nn.base import Module
+
 from numtorch.nn.relu import ReLU
 from numtorch.nn.sequential import Sequential
 from numtorch.nn.sigmoid import Sigmoid
@@ -28,14 +29,19 @@ class Net(Module):
 
     def __init__(self):
         super().__init__()
-        self.conv1 = Conv2D(in_channels=1, out_channels=4, kernel_size=(3, 3))
-        self.conv2 = Conv2D(in_channels=4, out_channels=8, kernel_size=(3, 3))
-        self.mlp = MLP(8 * 24 * 24, [256, 128], 10, activation=ReLU())
+        self.conv1 = Conv2D(in_channels=1, out_channels=4, kernel_size=(3, 3), padding=1)
+        self.pool1 = MaxPooling2D(kernel_size=(3, 3), stride=1, padding=0)
+
+        self.conv2 = Conv2D(in_channels=4, out_channels=2, kernel_size=(3, 3), padding=1)
+        self.pool2 = MaxPooling2D(kernel_size=(3, 3), stride=1, padding=0)
+        self.mlp = MLP(2 * 24 * 24, [256, 128], 10, activation=ReLU())
 
     def forward(self, x):
         b, c, h, w = x.shape
         x = self.conv1(x)
+        x = self.pool1(x)
         x = self.conv2(x)
+        x = self.pool2(x)
         x = x.reshape(b, -1)
         x = self.mlp(x)
         return x

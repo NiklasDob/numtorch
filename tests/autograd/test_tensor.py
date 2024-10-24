@@ -123,7 +123,7 @@ def test_tensor_setitem():
     t0[0] = nt.sum(t1 * t2)
 
     assert cp.array_equal(t0._data, cp.array([4 + 10 + 18, 0, 0]))
-    # Test backward propagation
+
     t3 = t0 * 2
     t3.backward()
 
@@ -139,14 +139,12 @@ def test_tensor_division():
 
     assert cp.allclose(t3._data, cp.array([1 / 4, 2 / 5, 3 / 6]))
 
-    # Test backward propagation
     t3.backward()
     assert cp.allclose(t1.grad, cp.array([1 / 4, 1 / 5, 1 / 6]))
     assert cp.allclose(t2.grad, cp.array([-1 / 16, -2 / 25, -3 / 36]))
 
 
 def test_tensor_topo_sort():
-    # Check the topological sorting of the graph during backward propagation
     t1 = Tensor([1, 2, 3], requires_grad=True)
     t2 = Tensor([4, 5, 6], requires_grad=True)
 
